@@ -79,6 +79,29 @@ jobs:
           REPO: ${{ github.repository }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
 
+      # 初回はプロジェクトを作る (ダッシュボードで作るにはファイルの
+      # アップロードが要って手間なので、ここで済ませる)。名前が他の
+      # アカウントと被ると pages.dev のサブドメインに乱数が付き、ci.yml が
+      # 組み立てる URL とずれるので、その場合は止めて名前の変更を促す。
+      - name: Ensure Cloudflare Pages project
+        if: steps.artifact.outputs.found == 'true'
+        run: |
+          api="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects"
+          auth="Authorization: Bearer $CLOUDFLARE_API_TOKEN"
+          if ! curl -fsS -H "$auth" "$api/$PROJECT" -o project.json; then
+            curl -fsS -X POST -H "$auth" -H "Content-Type: application/json" \
+              -d "{\"name\":\"$PROJECT\",\"production_branch\":\"main\"}" "$api" -o project.json
+          fi
+          subdomain=$(jq -r .result.subdomain project.json)
+          if [ "$subdomain" != "$PROJECT.pages.dev" ]; then
+            echo "::error::プロジェクト名 $PROJECT は他と被っていて $subdomain になった。Cloudflare でこのプロジェクトを削除し、CLOUDFLARE_PAGES_PROJECT を別の名前にする"
+            exit 1
+          fi
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
+
       # ブランチ名 pr-<番号> のプレビューデプロイは
       # https://pr-<番号>.<プロジェクト>.pages.dev で固定的に引ける。
       # pages.dev のプレビューには Cloudflare が X-Robots-Tag: noindex を付ける。
