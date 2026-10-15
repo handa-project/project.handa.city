@@ -1,0 +1,125 @@
+name: PR preview
+
+# PR ごとのプレビューを Cloudflare Pages へ上げ、URL を PR にコメントする。
+#
+# fork からの PR では pull_request のワークフローに secrets が渡らない。かと
+# いって pull_request_target で fork のコードをビルドすると secrets を握った
+# まま他人のコードを動かすことになる。そこで 2 段に分ける:
+#   1. ci.yml (pull_request・権限なし) がビルドし、dist を artifact に置く
+#   2. ここ (workflow_run・常に main の定義で動く) は artifact の静的ファイル
+#      を上げるだけ。fork のコードは checkout も実行もしない
+# fork PR の CI はメンテナが承認するまで動かないので、それが関門になる。
+#
+# 必要な設定 (Settings → Secrets and variables → Actions):
+#   secrets   CLOUDFLARE_API_TOKEN (Account → Cloudflare Pages → Edit のみ)
+#             CLOUDFLARE_ACCOUNT_ID
+#   variables CLOUDFLARE_PAGES_PROJECT (Cloudflare Pages のプロジェクト名)
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      vars.CLOUDFLARE_PAGES_PROJECT != ''
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      pull-requests: write
+    concurrency:
+      group: preview-${{ github.event.workflow_run.head_repository.full_name }}-${{ github.event.workflow_run.head_branch }}
+      cancel-in-progress: true
+    steps:
+      # dependabot の PR など、ci.yml が artifact を作らなかった実行では
+      # 何もしない (download が失敗しないよう先に有無を見る)。
+      - name: Check artifact
+        id: artifact
+        run: |
+          count=$(gh api "repos/$REPO/actions/runs/$RUN_ID/artifacts" \
+            --jq '[.artifacts[] | select(.name == "preview")] | length')
+          echo "found=$([ "$count" -gt 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+
+      - if: steps.artifact.outputs.found == 'true'
+        uses: actions/download-artifact@v8
+        with:
+          name: preview
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+
+      # PR 番号は fork 側が書いたもの = 信用できない入力。数字であることと、
+      # その PR の head が今回ビルドしたコミットであることを確かめてから使う
+      # (でないと別の PR のプレビューを上書きできてしまう)。
+      - name: Resolve PR
+        if: steps.artifact.outputs.found == 'true'
+        id: pr
+        run: |
+          number=$(cat dist-pr-number)
+          if ! [[ "$number" =~ ^[0-9]+$ ]]; then
+            echo "::error::invalid PR number: $number"
+            exit 1
+          fi
+          pr_sha=$(gh api "repos/$REPO/pulls/$number" --jq .head.sha)
+          if [ "$pr_sha" != "$HEAD_SHA" ]; then
+            echo "::error::PR #$number head ($pr_sha) does not match the built commit ($HEAD_SHA)"
+            exit 1
+          fi
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+
+      # ブランチ名 pr-<番号> のプレビューデプロイは
+      # https://pr-<番号>.<プロジェクト>.pages.dev で固定的に引ける。
+      # pages.dev のプレビューには Cloudflare が X-Robots-Tag: noindex を付ける。
+      - name: Deploy to Cloudflare Pages
+        if: steps.artifact.outputs.found == 'true'
+        run: >-
+          npx --yes wrangler@4.146.0 pages deploy dist
+          --project-name "$PROJECT"
+          --branch "pr-$PR_NUMBER"
+          --commit-hash "$HEAD_SHA"
+          --commit-dirty=true
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+
+      # コメントは PR ごとに 1 件だけ。目印付きの既存コメントがあれば更新する。
+      - name: Comment preview URL
+        if: steps.artifact.outputs.found == 'true'
+        run: |
+          marker='<!-- pr-preview -->'
+          url="https://pr-$PR_NUMBER.$PROJECT.pages.dev/"
+          body="$marker
+          ### プレビュー
+
+          $url
+
+          コミット \`${HEAD_SHA:0:7}\` のビルドです。push するたびに更新されます。"          id=$(gh api "repos/$REPO/issues/$PR_NUMBER/comments" --paginate \
+            --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"$marker\"))) | .id" \
+            | head -n 1)
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$REPO/issues/comments/$id" -f body="$body" > /dev/null
+          else
+            gh api -X POST "repos/$REPO/issues/$PR_NUMBER/comments" -f body="$body" > /dev/null
+          fi
+          echo "Preview: $url" >> "$GITHUB_STEP_SUMMARY"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}

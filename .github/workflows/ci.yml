@@ -50,7 +50,33 @@ jobs:
       # doctor は fail のみ exit 1 (warn は 0)。壊れたデプロイだけを止める。
       - run: npx cosense-site doctor
 
+      # PR プレビュー (preview.yml) 用に、Cloudflare Pages のプレビュー URL を
+      # origin としてビルドする (canonical / OGP / sitemap がその URL を指す)。
+      # CLOUDFLARE_PAGES_PROJECT 未登録なら空 → cosense.config.ts の既定値。
       - run: npx astro build
+        env:
+          PAGES_ORIGIN: ${{ vars.CLOUDFLARE_PAGES_PROJECT && format('https://pr-{0}.{1}.pages.dev', github.event.number, vars.CLOUDFLARE_PAGES_PROJECT) || '' }}
+          PAGES_BASE_PATH: /
+
+      # ここは fork のコードを secrets なしで動かす段。デプロイは secrets を
+      # 持つ preview.yml (workflow_run) が、この artifact を受け取って行う。
+      # fork PR では workflow_run.pull_requests が空なので PR 番号も同梱する。
+      - name: Package preview
+        if: vars.CLOUDFLARE_PAGES_PROJECT != '' && github.event.pull_request.user.login != 'dependabot[bot]'
+        run: echo "$PR_NUMBER" > dist-pr-number
+        env:
+          PR_NUMBER: ${{ github.event.number }}
+
+      - name: Upload preview
+        if: vars.CLOUDFLARE_PAGES_PROJECT != '' && github.event.pull_request.user.login != 'dependabot[bot]'
+        uses: actions/upload-artifact@v7
+        with:
+          name: preview
+          path: |
+            dist
+            dist-pr-number
+          retention-days: 3
+          include-hidden-files: true
 
   # Dependabot の PR は check が通れば自動でマージする (失敗した PR は残るので
   # 人が見る)。マージ後は build.yml の定時実行で公開サイトに反映される。
