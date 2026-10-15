@@ -19,9 +19,14 @@ jobs:
   check:
     runs-on: ubuntu-latest
     env:
-      # cosense.config.ts が読む。Settings → Secrets and variables → Actions →
-      # Variables に COSENSE_PROJECT (公開 Cosense プロジェクト名) を登録する。
-      COSENSE_PROJECT: ${{ vars.COSENSE_PROJECT }}
+      # fork からの PR には repository / organization の variables が渡らない
+      # (空になる)。どちらも秘密ではないので、ここに既定値を持たせて fork の
+      # PR でも同じようにビルドする。variables があればそちらが優先。
+      # cosense.config.ts が読む公開 Cosense プロジェクト名。
+      COSENSE_PROJECT: ${{ vars.COSENSE_PROJECT || 'handa-project' }}
+      # PR プレビュー (preview.yml) の Cloudflare Pages プロジェクト名。
+      # preview.yml 側の vars.CLOUDFLARE_PAGES_PROJECT と同じ値にしておく。
+      PREVIEW_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT || 'handa-project-preview' }}
     steps:
       - uses: actions/checkout@v7
 
@@ -52,23 +57,22 @@ jobs:
 
       # PR プレビュー (preview.yml) 用に、Cloudflare Pages のプレビュー URL を
       # origin としてビルドする (canonical / OGP / sitemap がその URL を指す)。
-      # CLOUDFLARE_PAGES_PROJECT 未登録なら空 → cosense.config.ts の既定値。
       - run: npx astro build
         env:
-          PAGES_ORIGIN: ${{ vars.CLOUDFLARE_PAGES_PROJECT && format('https://pr-{0}.{1}.pages.dev', github.event.number, vars.CLOUDFLARE_PAGES_PROJECT) || '' }}
+          PAGES_ORIGIN: ${{ format('https://pr-{0}.{1}.pages.dev', github.event.number, env.PREVIEW_PROJECT) }}
           PAGES_BASE_PATH: /
 
       # ここは fork のコードを secrets なしで動かす段。デプロイは secrets を
       # 持つ preview.yml (workflow_run) が、この artifact を受け取って行う。
       # fork PR では workflow_run.pull_requests が空なので PR 番号も同梱する。
       - name: Package preview
-        if: vars.CLOUDFLARE_PAGES_PROJECT != '' && github.event.pull_request.user.login != 'dependabot[bot]'
+        if: github.event.pull_request.user.login != 'dependabot[bot]'
         run: echo "$PR_NUMBER" > dist-pr-number
         env:
           PR_NUMBER: ${{ github.event.number }}
 
       - name: Upload preview
-        if: vars.CLOUDFLARE_PAGES_PROJECT != '' && github.event.pull_request.user.login != 'dependabot[bot]'
+        if: github.event.pull_request.user.login != 'dependabot[bot]'
         uses: actions/upload-artifact@v7
         with:
           name: preview
