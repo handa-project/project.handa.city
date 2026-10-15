@@ -2,8 +2,16 @@ name: Build and deploy
 
 on:
   workflow_dispatch:
+  # 15 分ごとに Cosense の更新を確かめ、変わっていたときだけビルドする
+  # (check ジョブ)。毎時 0 分は GitHub 全体で混んで遅延・取りこぼしが増える
+  # ので分をずらす。それでも schedule は数十分〜数時間遅れることがある。
+  # 2 本目は 1 日 1 回の強制ビルド。Dependabot の自動マージは GITHUB_TOKEN
+  # による push なのでワークフローを起動せず、Cosense 側も変わらないため、
+  # これが無いと依存の更新がいつまでも公開サイトに反映されない。
+  # 2 本目の式を変えるときは check ジョブの FORCE_SCHEDULE も合わせる。
   schedule:
-    - cron: "17 1,13 * * *"
+    - cron: "2,17,32,47 * * * *"
+    - cron: "9 18 * * *"
 
 # Required by actions/deploy-pages.
 permissions:
@@ -17,7 +25,60 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Cosense の「最終更新時刻 + ページ数」を前回デプロイ時の値と比べる。
+  # ページ数も見るのは、削除では最終更新時刻が変わらないため。前回値は
+  # deploy ジョブが成功時に cache のキーとして保存する (中身は使わない)。
+  # 空振りの回はここで終わるので数秒で済む。
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.result.outputs.changed }}
+      state-key: ${{ steps.state.outputs.key }}
+    steps:
+      - name: Fetch Cosense state
+        id: state
+        run: |
+          if body=$(curl -fsS --retry 3 --max-time 30 \
+              "https://scrapbox.io/api/pages/$COSENSE_PROJECT?limit=1&sort=updated"); then
+            key=$(jq -r '"cosense-state-\(.count)-\(.pages[0].updated // 0)"' <<< "$body")
+            echo "key=$key" >> "$GITHUB_OUTPUT"
+            echo "Cosense state: $key"
+          else
+            # 取れないときは変わったものとして扱い、ビルド側で原因を出させる
+            echo "::warning::Cosense の更新状況を取得できなかったのでビルドする"
+          fi
+        env:
+          COSENSE_PROJECT: ${{ vars.COSENSE_PROJECT }}
+
+      - name: Look up last deployed state
+        id: last
+        if: steps.state.outputs.key != ''
+        uses: actions/cache/restore@v6
+        with:
+          path: .cosense-state
+          key: ${{ steps.state.outputs.key }}
+          lookup-only: true
+
+      # 定期実行の 15 分枠でだけスキップする。手動実行と 1 日 1 回の枠は必ず
+      # ビルドする。
+      - name: Decide
+        id: result
+        run: |
+          if [ "$EVENT" = schedule ] && [ "$SCHEDULE" != "$FORCE_SCHEDULE" ] && [ "$HIT" = true ]; then
+            echo "Cosense は前回のデプロイから変わっていないのでスキップする"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          EVENT: ${{ github.event_name }}
+          SCHEDULE: ${{ github.event.schedule }}
+          FORCE_SCHEDULE: "9 18 * * *"
+          HIT: ${{ steps.last.outputs.cache-hit }}
+
   build:
+    needs: check
+    if: needs.check.outputs.changed == 'true'
     runs-on: ubuntu-latest
     env:
       # cosense.config.ts が読む。Settings → Secrets and variables → Actions →
@@ -60,7 +121,7 @@ jobs:
           path: ./dist
 
   deploy:
-    needs: build
+    needs: [check, build]
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -68,3 +129,17 @@ jobs:
     steps:
       - id: deploy
         uses: actions/deploy-pages@v5
+
+      # check ジョブが見た状態をデプロイ済みとして記録する。ビルド中に更新が
+      # 入っていても、記録は check 時点の値なので次の回で拾い直される。
+      - name: Record deployed state
+        if: needs.check.outputs.state-key != ''
+        run: mkdir -p .cosense-state && echo "$STATE_KEY" > .cosense-state/key
+        env:
+          STATE_KEY: ${{ needs.check.outputs.state-key }}
+
+      - if: needs.check.outputs.state-key != ''
+        uses: actions/cache/save@v6
+        with:
+          path: .cosense-state
+          key: ${{ needs.check.outputs.state-key }}

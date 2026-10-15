@@ -55,6 +55,8 @@ export default defineCosenseSite({
 
   deploy: {
     target: "github-pages",
-    schedule: "17 1,13 * * *",
+    // build.yml の 15 分枠 (更新が無ければビルドを省く)。1 日 1 回の強制
+    // ビルド枠は build.yml 側にだけある。
+    schedule: "2,17,32,47 * * * *",
   },
 });

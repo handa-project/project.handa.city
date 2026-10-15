@@ -60,7 +60,7 @@
 **Actions** タブ → 左側の **「Build and deploy」** → 右側の **「Run workflow」→「Run workflow」** をクリック。
 
 - 1〜2 分でビルドとデプロイが走ります。緑のチェックが付けば成功です。
-- 以降は **1 日 2 回の cron が自動で再ビルド** するので、Cosense を編集すれば放っておいても反映されます（すぐ反映したいときは再度 Run workflow）。
+- 以降は **15 分ごとに Cosense の更新を確かめ、変わっていれば自動で再ビルド** するので、Cosense を編集すれば放っておいても反映されます。GitHub の定期実行は混雑で遅れることがあり、反映まで数十分〜数時間かかる場合もあります（すぐ反映したいときは再度 Run workflow）。
 
 > はじめて Actions を使うとき「I understand my workflows, go ahead and enable them」の確認が出たら許可してください。
 
@@ -261,7 +261,7 @@ git push
 
 ### 依存の自動更新
 
-cosense-site-kit（テーマ・CLI）や Astro の新しいバージョンは、Dependabot が毎日確認して PR を立てます。PR では CI（取得 → `doctor` → ビルド）が走り、**通ったものは自動でマージ**され、次回の定時ビルドでサイトに反映されます。CI が失敗した PR はマージされずに残るので、内容を確認してください。
+cosense-site-kit（テーマ・CLI）や Astro の新しいバージョンは、Dependabot が毎日確認して PR を立てます。PR では CI（取得 → `doctor` → ビルド）が走り、**通ったものは自動でマージ**され、1 日 1 回の強制ビルド（日本時間 3 時台）でサイトに反映されます。CI が失敗した PR はマージされずに残るので、内容を確認してください。
 
 自動マージを止めたい場合は `.github/workflows/ci.yml` の `automerge` job を削除してください（PR は引き続き立ちます）。
 
@@ -292,7 +292,7 @@ Pages のプロジェクトは、最初のプレビューのときにワーク�
 |---|---|
 | `cosense.config.ts` | データソース（Cosense プロジェクトは環境変数 `COSENSE_PROJECT` から）、公開ルール（`#publish` 等のタグ）、slug 戦略、公開先。 |
 | `astro.config.ts` | テーマのオプション（`themeDefault({ nav, copyright, preset, search, ... })`）や他の Astro インテグレーションの追加。 |
-| `.github/workflows/build.yml` | 取得 → ビルド → GitHub Pages デプロイの自動化。cron は `cosense.config.ts` の `deploy.schedule` 由来。`COSENSE_PROJECT` 変数をここで渡しています。 |
+| `.github/workflows/build.yml` | 取得 → ビルド → GitHub Pages デプロイの自動化。15 分ごとに Cosense の更新を確かめ、変わったときだけビルドする（1 日 1 回は必ずビルド）。15 分枠の cron は `cosense.config.ts` の `deploy.schedule` と揃えています。`COSENSE_PROJECT` 変数をここで渡しています。 |
 | `.github/workflows/ci.yml` / `.github/dependabot.yml` | PR ごとの検証と、依存更新 PR（Dependabot）の自動マージ。 |
 | Cosense の `.site` ページ | ナビ / ホーム / 記事一覧などのサイト構造（ブラウザだけで変更可）。 |
 
