@@ -16,9 +16,10 @@ export interface Policy {
 export const handaConfig = config as unknown as {
   site: { title: string; description?: string };
   nav: NavItem[];
-  home: { about?: string; slides?: string };
+  home: { about?: string; aboutMore?: string[]; slides?: string };
   intros: Partial<Record<"blog" | "works" | "members", string>>;
   tags: { blog: string; works: string };
+  members?: { departments?: string[]; roles?: string[] };
   blogPageSize?: number;
   copyright: { holder: string };
   policies: Policy[];

@@ -1,0 +1,74 @@
+---
+// HAnDA: トップの ABOUT 欄に並べる 1 ページ分（HAnDAプロジェクトとは／半田市とは／赤レンガ建物とは など）。
+//   - Cosense の区切り線（ーーーーー）より上だけを表示する（全文は概要ページで。「詳しく見る」はトップで最後に 1 つだけ）
+//   - ページに写真を貼ると、最初の 1 枚が右側に出る（スマホでは文章の下）
+import type { CollectionEntry } from "astro:content";
+import PageContent from "./Content.astro";
+import { splitAtSeparator } from "../lib/separator";
+
+interface Props {
+  entry: CollectionEntry<"pages">;
+  /** 見出し（無ければページタイトル）。ABOUT の最初のページは SectionHeader を使うので出さない */
+  heading?: boolean;
+}
+const { entry, heading = true } = Astro.props;
+const image = entry.data.image;
+type Block = { type: string; url?: string };
+const { before } = splitAtSeparator(entry.data.blocks as unknown as Block[]);
+// 右側に出す写真は本文からは外す
+const textBlocks = image ? before.filter((b) => !(b.type === "image" && b.url === image)) : before;
+---
+<div class:list={["about-block", { "has-image": image }]}>
+  <div class="about-text">
+    {heading && <h3 class="about-title">{entry.data.title}</h3>}
+    <div class="about-body"><PageContent blocks={textBlocks as never} /></div>
+  </div>
+  {image && (
+    <figure class="about-photo">
+      <img src={image} alt="" loading="lazy" decoding="async" />
+    </figure>
+  )}
+</div>
+
+<style>
+  .about-block + .about-block {
+    margin-top: 2.75rem;
+    padding-top: 2.25rem;
+    border-top: 1px solid var(--color-border);
+  }
+  .about-block.has-image {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 38%);
+    gap: 2rem;
+    align-items: start;
+  }
+  .about-title {
+    margin: 0 0 0.9rem;
+    padding-left: 0.65rem;
+    border-left: 3px solid var(--color-accent);
+    font-size: 1.15rem;
+    letter-spacing: 0.04em;
+    line-height: 1.4;
+  }
+  .about-photo {
+    margin: 0;
+    border-radius: 10px;
+    overflow: hidden;
+    background: var(--color-bg-soft);
+    aspect-ratio: 4 / 3;
+  }
+  .about-photo img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    margin: 0;
+    border-radius: 0;
+  }
+  @media (max-width: 720px) {
+    .about-block.has-image {
+      grid-template-columns: 1fr;
+      gap: 1.25rem;
+    }
+  }
+</style>

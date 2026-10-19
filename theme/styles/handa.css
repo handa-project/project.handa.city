@@ -82,11 +82,12 @@ h2, h3, h4, h5, h6 { letter-spacing: 0.03em; }
 }
 
 /* レンガ模様。色を変えたいときは SVG の fill（レンガ #ecc3c7 / 目地 #fbf3f4）を書き換える。
-   イギリス積み = 長手（横長）の段と小口（短い）の段を1段ずつ交互に積む */
+   イギリス積み = 長手（横長）の段と小口（短い）の段を1段ずつ交互に積む。
+   寸法は普通れんが（210×100×60mm、目地10mm）の比率。大きさは background-size で変える */
 html {
   background-color: #fbf3f4;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2764%27 height=%2732%27 viewBox=%270 0 64 32%27%3E%3Crect width=%2764%27 height=%2732%27 fill=%27%23fbf3f4%27/%3E%3Cg fill=%27%23ecc3c7%27%3E%3Crect x=%271.5%27 y=%271.5%27 width=%2761%27 height=%2713%27 rx=%270.8%27/%3E%3Crect x=%27-14.5%27 y=%2717.5%27 width=%2729%27 height=%2713%27 rx=%270.8%27/%3E%3Crect x=%2717.5%27 y=%2717.5%27 width=%2729%27 height=%2713%27 rx=%270.8%27/%3E%3Crect x=%2749.5%27 y=%2717.5%27 width=%2729%27 height=%2713%27 rx=%270.8%27/%3E%3C/g%3E%3C/svg%3E");
-  background-size: 64px 32px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27220%27 height=%27140%27 viewBox=%270 0 220 140%27%3E%3Crect width=%27220%27 height=%27140%27 fill=%27%23fbf3f4%27/%3E%3Cg fill=%27%23ecc3c7%27%3E%3Crect x=%275%27 y=%275%27 width=%27210%27 height=%2760%27 rx=%273%27/%3E%3Crect x=%27-50%27 y=%2775%27 width=%27100%27 height=%2760%27 rx=%273%27/%3E%3Crect x=%2760%27 y=%2775%27 width=%27100%27 height=%2760%27 rx=%273%27/%3E%3Crect x=%27170%27 y=%2775%27 width=%27100%27 height=%2760%27 rx=%273%27/%3E%3C/g%3E%3C/svg%3E");
+  background-size: 66px 42px;
 }
 
 /* ヘッダー：横いっぱいの帯をやめ、パネル幅で切り落とす */
@@ -192,4 +193,10 @@ html {
   .site-header.has-js .site-nav-wrap,
   .site-header.has-js .site-nav li,
   .site-nav-toggle .bar { transition: none !important; }
+}
+
+/* ---- ページ内リンク（目次・「ページの先頭へ」など）はなめらかにスクロール ---- */
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
 }

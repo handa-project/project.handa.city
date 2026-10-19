@@ -189,3 +189,8 @@ export async function loadContact(): Promise<ContactData> {
     sns,
   };
 }
+
+/** ボタンに表示するサービス名（X は「𝕏」の文字で X らしく見せる） */
+export function serviceMark(service: string): string {
+  return service.toLowerCase() === "x" ? "𝕏" : service;
+}

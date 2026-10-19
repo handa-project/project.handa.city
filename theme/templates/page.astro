@@ -9,6 +9,8 @@ import BackLink from "../components/BackLink.astro";
 import Layout from "../components/Layout.astro";
 import SectionHeader from "../components/SectionHeader.astro";
 import { backLinkFor, isWorksPage, loadSections } from "../lib/sections";
+import { getCollection } from "astro:content";
+import { handaConfig } from "../lib/config";
 
 interface Props {
   entry: CollectionEntry<"pages">;
@@ -35,6 +37,20 @@ const navSection = (await loadSections()).find((s) => s.entry?.data.slug === pag
 const back = await backLinkFor(page.tags);
 // 活動・成果のページは日付を出さない
 const isWorks = await isWorksPage(entry);
+// HAnDA: 概要ページ（handa.config.ts の home.about）の下に、home.aboutMore のページ（半田市とは・赤レンガ建物とは など）を続けて載せる
+const aboutMore =
+  page.title === handaConfig.home.about
+    ? (await Promise.all(
+        (handaConfig.home.aboutMore ?? []).map(async (t) => (await getCollection("pages")).find((e) => e.data.title === t)),
+      )).filter((e): e is CollectionEntry<"pages"> => Boolean(e))
+    : [];
+const isAbout = page.title === handaConfig.home.about;
+// 概要ページの目次（ページ内の各項目へ）
+const aboutToc = isAbout ? [page.title, ...aboutMore.map((e) => e.data.title)] : [];
+// 追加の項目は、最初の写真を見出しの下に大きく出し、本文からは外す
+const withoutCover = (e: CollectionEntry<"pages">) =>
+  e.data.image ? (e.data.blocks as unknown as { type: string; url?: string }[]).filter((b) => !(b.type === "image" && b.url === e.data.image)) : e.data.blocks;
+const num = (i: number) => String(i).padStart(2, "0");
 ---
 <Layout title={page.title} description={page.summary} image={page.image} ogType="article">
   <article data-pagefind-body>
@@ -57,14 +73,138 @@ const isWorks = await isWorksPage(entry);
     </header>
     )}
 
-    <PageContent blocks={page.blocks} morphName={morphName} morphImageUrl={page.image} />
+    {aboutToc.length > 1 && (
+      <nav class="about-toc" aria-label="このページの項目" data-pagefind-ignore>
+        <ol>
+          {aboutToc.map((t, i) => (
+            <li><a href={`#${encodeURIComponent(i === 0 ? "about-top" : t)}`}><span class="about-toc-num">{num(i + 1)}</span>{t}</a></li>
+          ))}
+        </ol>
+      </nav>
+    )}
 
-    <Backlinks backlinks={page.backlinks} />
+    <div id="about-top" class:list={{ "about-main": isAbout }}>
+      <PageContent blocks={page.blocks} morphName={morphName} morphImageUrl={page.image} />
+    </div>
 
-    <Related title={page.title} links={page.links} exclude={page.backlinks} />
+    {aboutMore.map((e, i) => (
+      <section class="about-more" id={e.data.title}>
+        <header class="about-more-head">
+          <span class="about-more-num" aria-hidden="true">{num(i + 2)}</span>
+          <h2 class="about-more-title">{e.data.title}</h2>
+        </header>
+        {e.data.image && (
+          <figure class="about-more-cover"><img src={e.data.image} alt="" loading="lazy" decoding="async" /></figure>
+        )}
+        <PageContent blocks={withoutCover(e) as never} />
+      </section>
+    ))}
+
+    {isAbout && aboutMore.length > 0 && (
+      <p class="about-backtop"><a href="#top">↑ ページの先頭へ</a></p>
+    )}
+
+    {!isAbout && <Backlinks backlinks={page.backlinks} />}
+
+    {!isAbout && <Related title={page.title} links={page.links} exclude={page.backlinks} />}
 
     <footer class="source" data-pagefind-ignore>
       <a href={page.sourceUrl} target="_blank" rel="noopener noreferrer">Source on Cosense ↗</a>
     </footer>
   </article>
 </Layout>
+
+<style>
+  /* 概要ページ：目次 */
+  .about-toc {
+    margin: -0.5rem 0 2.5rem;
+  }
+  .about-toc ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .about-toc a {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.45rem;
+    padding: 0.4rem 0.95rem;
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    color: var(--color-text-soft);
+    font-size: 0.88rem;
+    text-decoration: none;
+    transition: border-color 0.15s var(--ease), color 0.15s var(--ease), background 0.15s var(--ease);
+  }
+  .about-toc a:hover {
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+    background: var(--color-accent-soft);
+    text-decoration: none;
+  }
+  .about-toc-num {
+    font-family: "Oswald", var(--font-sans);
+    font-size: 0.78rem;
+    letter-spacing: 0.06em;
+    color: var(--color-accent);
+  }
+  .about-main { scroll-margin-top: 5rem; }
+
+  /* 概要ページ：追加の項目（学生チャレンジプロジェクト・半田市・赤レンガ建物 など） */
+  .about-more {
+    margin-top: 4rem;
+    padding-top: 2.75rem;
+    border-top: 1px solid var(--color-border);
+    scroll-margin-top: 5rem;
+  }
+  .about-more-head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.9rem;
+    margin-bottom: 1.5rem;
+  }
+  .about-more-num {
+    font-family: "Oswald", var(--font-sans);
+    font-size: 2rem;
+    font-weight: 500;
+    line-height: 1;
+    letter-spacing: 0.04em;
+    color: var(--color-accent);
+  }
+  .about-more-title {
+    margin: 0;
+    font-size: 1.5rem;
+    letter-spacing: 0.04em;
+    line-height: 1.4;
+  }
+  .about-more-cover {
+    margin: 0 0 1.75rem;
+    border-radius: 12px;
+    overflow: hidden;
+    aspect-ratio: 21 / 9;
+    background: var(--color-bg-soft);
+  }
+  .about-more-cover img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    margin: 0;
+    border-radius: 0;
+  }
+  .about-backtop {
+    margin: 3.5rem 0 0;
+    text-align: center;
+    font-size: 0.85rem;
+  }
+  .about-backtop a { color: var(--color-text-muted); }
+  @media (max-width: 720px) {
+    .about-more { margin-top: 3rem; padding-top: 2rem; }
+    .about-more-num { font-size: 1.6rem; }
+    .about-more-title { font-size: 1.25rem; }
+    .about-more-cover { aspect-ratio: 16 / 9; }
+  }
+</style>

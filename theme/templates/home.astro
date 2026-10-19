@@ -12,7 +12,9 @@ import { getCollection } from "astro:content";
 import site from "virtual:cosense-site-kit/site";
 import { hasTag } from "@cosense-site-kit/theme-utils";
 import PageContent from "../components/Content.astro"; // HAnDA: 外部 URL をリンクカードにする版
-import { splitAtSeparator } from "../lib/separator";
+import AboutBlock from "../components/AboutBlock.astro";
+import AboutCard from "../components/AboutCard.astro";
+import { handaConfig } from "../lib/config";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import Card from "../components/Card.astro";
@@ -20,11 +22,12 @@ import EntryCard from "../components/EntryCard.astro";
 import HeroSlides from "../components/HeroSlides.astro";
 import Layout from "../components/Layout.astro";
 import SectionHeader from "../components/SectionHeader.astro";
-import { loadContact } from "../lib/contact";
+import { loadContact, serviceMark } from "../lib/contact";
 import { byNewest, loadSections, postsTag, sectionInfo, worksTag } from "../lib/sections";
 import { loadSlides } from "../lib/slides";
 
-const HOME_CARDS = 3;
+// トップのブログ・活動の欄に出す最大件数（横送りで見る）
+const HOME_CARDS = 9;
 
 const all = (await getCollection("pages")).sort(byNewest);
 const sections = await loadSections();
@@ -39,6 +42,10 @@ const intros = {
 };
 
 const contact = await loadContact();
+// ABOUT 欄に続けて並べるページ（無いページは飛ばす）
+const aboutMore = (handaConfig.home.aboutMore ?? [])
+  .map((t) => all.find((e) => e.data.title === t))
+  .filter((e): e is (typeof all)[number] => Boolean(e));
 
 const siteTitle = site?.title ?? "Home";
 const siteDescription = site?.description;
@@ -77,18 +84,20 @@ const heroLogo = existsSync(join(process.cwd(), "public", "logo-full.png")) ? `$
       {s.kind === "about" && s.entry && (
         <Fragment>
           <SectionHeader as="h2" en={s.en} title={s.entry.data.title} />
-          {/* 概要：Cosense の区切り線（ーーーーー）より上だけをトップに出し、続きは概要ページで読む */}
-          {(() => {
-            const { before, after } = splitAtSeparator(s.entry.data.blocks);
-            return (
-              <Fragment>
-                <div class="about-body"><PageContent blocks={before} /></div>
-                {after && after.length > 0 && (
-                  <a class="more-link" href={s.href}>詳しく見る <span aria-hidden="true">→</span></a>
-                )}
-              </Fragment>
-            );
-          })()}
+          {/* 概要：HAnDAプロジェクトとは＋handa.config.ts の home.aboutMore のページ（半田市とは・赤レンガ建物とは など） */}
+          <AboutBlock entry={s.entry} heading={false} />
+          {/* 学生チャレンジプロジェクトとは・半田市とは などのカード。1 枚ずつ見せて、左右の矢印かスワイプで送る */}
+          {aboutMore.length > 0 && (
+            <div class="carousel about-carousel" data-carousel style="--per: 1">
+              <ul class="carousel-track about-cards">
+                {aboutMore.map((e) => <li><AboutCard entry={e} href={`${s.href}#${encodeURIComponent(e.data.title)}`} /></li>)}
+              </ul>
+              <button type="button" class="carousel-btn is-prev" aria-label="前へ" hidden><span aria-hidden="true"></span></button>
+              <button type="button" class="carousel-btn is-next" aria-label="次へ" hidden><span aria-hidden="true"></span></button>
+            </div>
+          )}
+          {/* 「詳しく見る」は最後に 1 つだけ（概要ページに全部まとめて載っている） */}
+          <a class="more-link about-all" href={s.href}>もっと読む <span aria-hidden="true">→</span></a>
         </Fragment>
       )}
 
@@ -96,7 +105,7 @@ const heroLogo = existsSync(join(process.cwd(), "public", "logo-full.png")) ? `$
         <Fragment>
           <SectionHeader as="h2" en={s.en} title={s.ja} lead={intros.blog} />
           {posts.length > 0
-            ? <ul class="card-grid">{posts.slice(0, HOME_CARDS).map((e) => <Card entry={e} />)}</ul>
+            ? <div class="carousel" data-carousel style="--per: 3"><ul class="card-grid carousel-track">{posts.slice(0, HOME_CARDS).map((e) => <Card entry={e} />)}</ul><button type="button" class="carousel-btn is-prev" aria-label="前へ" hidden><span aria-hidden="true"></span></button><button type="button" class="carousel-btn is-next" aria-label="次へ" hidden><span aria-hidden="true"></span></button></div>
             : <p class="home-empty">まだ記事がありません。</p>}
           <a class="more-link" href={s.href}>{s.ja}一覧へ <span aria-hidden="true">→</span></a>
         </Fragment>
@@ -106,7 +115,7 @@ const heroLogo = existsSync(join(process.cwd(), "public", "logo-full.png")) ? `$
         <Fragment>
           <SectionHeader as="h2" en={s.en} title={s.ja} lead={intros.works} />
           {works.length > 0
-            ? <ul class="card-grid">{works.slice(0, HOME_CARDS).map((e) => <Card entry={e} showDate={false} />)}</ul>
+            ? <div class="carousel" data-carousel style="--per: 3"><ul class="card-grid carousel-track">{works.slice(0, HOME_CARDS).map((e) => <Card entry={e} showDate={false} />)}</ul><button type="button" class="carousel-btn is-prev" aria-label="前へ" hidden><span aria-hidden="true"></span></button><button type="button" class="carousel-btn is-next" aria-label="次へ" hidden><span aria-hidden="true"></span></button></div>
             : <p class="home-empty">まだ活動が登録されていません。</p>}
           <a class="more-link" href={s.href}>{s.ja}一覧へ <span aria-hidden="true">→</span></a>
         </Fragment>
@@ -129,8 +138,8 @@ const heroLogo = existsSync(join(process.cwd(), "public", "logo-full.png")) ? `$
               {contact.accounts.map((a) => (
                 <li>
                   {a.url
-                    ? <a class:list={["home-account", `is-${a.service.toLowerCase()}`]} href={a.url} target="_blank" rel="noopener noreferrer"><b>{a.service}</b>{a.handle && <span>@{a.handle}</span>}<span aria-hidden="true">↗</span></a>
-                    : <span class:list={["home-account", "is-pending", `is-${a.service.toLowerCase()}`]}><b>{a.service}</b><span>準備中</span></span>}
+                    ? <a class:list={["home-account", `is-${a.service.toLowerCase()}`]} href={a.url} target="_blank" rel="noopener noreferrer"><b>{serviceMark(a.service) === a.service ? a.service : <Fragment><span aria-hidden="true">{serviceMark(a.service)}</span><span class="sr-only">{a.service}</span></Fragment>}</b>{a.handle && <span>@{a.handle}</span>}<span aria-hidden="true">↗</span></a>
+                    : <span class:list={["home-account", "is-pending", `is-${a.service.toLowerCase()}`]}><b>{serviceMark(a.service) === a.service ? a.service : <Fragment><span aria-hidden="true">{serviceMark(a.service)}</span><span class="sr-only">{a.service}</span></Fragment>}</b><span>準備中</span></span>}
                 </li>
               ))}
               {contact.mail?.href && (
@@ -152,6 +161,27 @@ const heroLogo = existsSync(join(process.cwd(), "public", "logo-full.png")) ? `$
 </Layout>
 
 <script>
+  // ABOUT・ブログ・活動のカードの左右送り（入りきらないときだけ矢印を出す）
+  document.querySelectorAll<HTMLElement>("[data-carousel]").forEach((root) => {
+    const list = root.querySelector<HTMLElement>(".carousel-track");
+    const prev = root.querySelector<HTMLButtonElement>(".is-prev");
+    const next = root.querySelector<HTMLButtonElement>(".is-next");
+    if (!list || !prev || !next) return;
+    const update = () => {
+      const max = list.scrollWidth - list.clientWidth;
+      const scrollable = max > 4;
+      prev.hidden = next.hidden = !scrollable;
+      prev.disabled = list.scrollLeft <= 4;
+      next.disabled = list.scrollLeft >= max - 4;
+    };
+    const step = () => list.clientWidth + parseFloat(getComputedStyle(list).columnGap || "0");
+    prev.addEventListener("click", () => list.scrollBy({ left: -step(), behavior: "smooth" }));
+    next.addEventListener("click", () => list.scrollBy({ left: step(), behavior: "smooth" }));
+    list.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update);
+    update();
+  });
+
   const hero = document.querySelector(".hero:not(.has-slides)");
   const root = document.documentElement;
   if (hero && "IntersectionObserver" in window) {
@@ -176,6 +206,71 @@ const heroLogo = existsSync(join(process.cwd(), "public", "logo-full.png")) ? `$
 </style>
 
 <style>
+  /* ABOUT 欄の最後の「もっと読む」（ほかの欄の「〇〇一覧へ」と同じ形） */
+  .about-all { margin-top: 2rem; }
+  /* カードの横送り（ABOUT は 1 枚、ブログ・活動は 3 枚ずつ表示。スマホは 1 枚） */
+  .carousel { position: relative; }
+  .about-carousel { margin-top: 2rem; }
+  .carousel-track {
+    --gap: 1.25rem;
+    list-style: none;
+    margin: 0;
+    padding: 0.25rem 0 0.5rem;
+    display: grid;
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: calc((100% - var(--gap) * (var(--per, 2) - 1)) / var(--per, 2));
+    gap: var(--gap);
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-behavior: smooth;
+    scrollbar-width: none;
+  }
+  .carousel-track::-webkit-scrollbar { display: none; }
+  .carousel-track > :global(li) { scroll-snap-align: start; min-width: 0; }
+  @media (max-width: 900px) {
+    .carousel[style*="--per: 3"] .carousel-track { grid-auto-columns: calc((100% - var(--gap)) / 2); }
+  }
+  /* スマホは矢印を出さず、次のカードを少しのぞかせてスワイプで送る */
+  @media (max-width: 720px) {
+    .carousel .carousel-track,
+    .carousel[style*="--per: 3"] .carousel-track { grid-auto-columns: 86%; --gap: 0.75rem; }
+    .carousel .carousel-btn { display: none; }
+  }
+  .carousel-btn {
+    position: absolute;
+    top: 38%;
+    z-index: 2;
+    width: 2.6rem;
+    height: 2.6rem;
+    padding: 0;
+    border: 1px solid var(--color-border);
+    border-radius: 50%;
+    background: var(--color-bg);
+    box-shadow: 0 4px 14px rgb(0 0 0 / 0.12);
+    cursor: pointer;
+    transform: translateY(-50%);
+    transition: border-color 0.15s var(--ease), opacity 0.2s var(--ease);
+  }
+  .carousel-btn:hover { border-color: var(--color-accent); }
+  .carousel-btn[hidden] { display: none; }
+  .carousel-btn:disabled { opacity: 0; pointer-events: none; }
+  .carousel-btn.is-prev { left: -1.3rem; }
+  .carousel-btn.is-next { right: -1.3rem; }
+  .carousel-btn span {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0.6rem;
+    height: 0.6rem;
+    border-top: 2px solid var(--color-text);
+    border-right: 2px solid var(--color-text);
+  }
+  .carousel-btn.is-prev span { transform: translate(-30%, -50%) rotate(-135deg); }
+  .carousel-btn.is-next span { transform: translate(-70%, -50%) rotate(45deg); }
+  .carousel-btn:hover span { border-color: var(--color-accent); }
+
+
   /* スライドがあるときは、白いパネルの端から端まで写真を広げる */
   .hero.has-slides {
     max-width: none;
@@ -265,8 +360,18 @@ const heroLogo = existsSync(join(process.cwd(), "public", "logo-full.png")) ? `$
     text-decoration: none;
     transition: transform 0.15s var(--ease), filter 0.15s var(--ease);
   }
-  .home-account.is-x { --c: #1d1d22; }
-  .home-account.is-tiktok { --c: #1658a0; }
+  /* 各サービスのイメージカラー */
+  .home-account.is-x { --c: #000; }
+  .home-account.is-instagram {
+    --c: #d62976;
+    background: linear-gradient(45deg, #feda75 0%, #fa7e1e 22%, #d62976 50%, #962fbf 75%, #4f5bd5 100%);
+  }
+  .home-account.is-tiktok { --c: #010101; }
+  .home-account.is-x b { font-family: var(--font-sans); font-size: 1.15rem; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .home-account.is-tiktok b { text-shadow: -1.5px -1.5px 0 #25f4ee, 1.5px 1.5px 0 #fe2c55; }
+  .home-account.is-youtube { --c: #ff0000; }
+  .home-account.is-facebook { --c: #1877f2; }
   .home-account.is-mail { --c: var(--color-bg); color: var(--color-text); border: 1.5px solid var(--color-text); }
   a.home-account:hover { text-decoration: none; transform: translateY(-2px); filter: brightness(1.08); }
   .home-account.is-pending { opacity: 0.45; }

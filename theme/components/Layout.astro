@@ -77,10 +77,11 @@ const htmlStyle = [
     <meta name="viewport" content="width=device-width" />
     {metaDescription && <meta name="description" content={metaDescription} />}
     {canonical && <link rel="canonical" href={canonical} />}
-    {/* HAnDA: タブのアイコンはロゴ（public/favicon.ico・favicon-512.png・apple-touch-icon.png） */}
-    <link rel="icon" href={`${base}/favicon.ico`} sizes="48x48" />
-    <link rel="icon" href={`${base}/favicon-512.png`} type="image/png" sizes="512x512" />
-    <link rel="apple-touch-icon" href={`${base}/apple-touch-icon.png`} />
+    {/* HAnDA: タブのアイコンはロゴ（public/favicon.ico・favicon-512.png・apple-touch-icon.png）
+        アイコンを差し替えたら ?v= の数字を上げる（ブラウザ、特に Safari が古いアイコンを覚えているため） */}
+    <link rel="icon" href={`${base}/favicon.ico?v=2`} sizes="48x48" />
+    <link rel="icon" href={`${base}/favicon-512.png?v=2`} type="image/png" sizes="512x512" />
+    <link rel="apple-touch-icon" href={`${base}/apple-touch-icon.png?v=2`} />
     {hasFeed && (
       <link rel="alternate" type="application/rss+xml" title={`${siteTitle} feed`} href={path("feed.xml")} />
     )}

@@ -5,7 +5,7 @@ import Layout from "../components/Layout.astro";
 import SectionHeader from "../components/SectionHeader.astro";
 import BackLink from "../components/BackLink.astro";
 import { homeBack } from "../lib/sections";
-import { loadContact } from "../lib/contact";
+import { loadContact, serviceMark } from "../lib/contact";
 
 const data = await loadContact();
 ---
@@ -23,13 +23,13 @@ const data = await loadContact();
             <li>
               {a.url ? (
                 <a class:list={["account-btn", `is-${a.service.toLowerCase()}`]} href={a.url} target="_blank" rel="noopener noreferrer">
-                  <span class="account-service">{a.service}</span>
+                  <span class="account-service">{serviceMark(a.service) === a.service ? a.service : <Fragment><span aria-hidden="true">{serviceMark(a.service)}</span><span class="sr-only">{a.service}</span></Fragment>}</span>
                   {a.handle && <span class="account-handle">@{a.handle}</span>}
                   <span class="account-cta">アカウントを見る <span aria-hidden="true">↗</span></span>
                 </a>
               ) : (
                 <div class:list={["account-btn", "is-pending", `is-${a.service.toLowerCase()}`]}>
-                  <span class="account-service">{a.service}</span>
+                  <span class="account-service">{serviceMark(a.service) === a.service ? a.service : <Fragment><span aria-hidden="true">{serviceMark(a.service)}</span><span class="sr-only">{a.service}</span></Fragment>}</span>
                   <span class="account-cta">準備中</span>
                 </div>
               )}
@@ -118,9 +118,16 @@ const data = await loadContact();
     text-decoration: none;
     transition: transform 0.15s var(--ease), box-shadow 0.15s var(--ease), filter 0.15s var(--ease);
   }
-  .account-btn.is-x { --c: #1d1d22; }
-  .account-btn.is-instagram { --c: var(--color-accent); }
-  .account-btn.is-tiktok { --c: #1658a0; }
+  /* 各サービスのイメージカラー */
+  .account-btn.is-x { --c: #000; }
+  .account-btn.is-instagram {
+    --c: #d62976;
+    background: linear-gradient(45deg, #feda75 0%, #fa7e1e 22%, #d62976 50%, #962fbf 75%, #4f5bd5 100%);
+  }
+  .account-btn.is-tiktok { --c: #010101; }
+  .account-btn.is-tiktok .account-service { text-shadow: -2px -2px 0 #25f4ee, 2px 2px 0 #fe2c55; }
+  .account-btn.is-youtube { --c: #ff0000; }
+  .account-btn.is-facebook { --c: #1877f2; }
   a.account-btn:hover {
     text-decoration: none;
     transform: translateY(-3px);
@@ -137,6 +144,8 @@ const data = await loadContact();
     line-height: 1.1;
     overflow-wrap: anywhere;
   }
+  .account-btn.is-x .account-service { font-family: var(--font-sans); font-size: 1.9rem; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .account-handle { font-size: 0.95rem; opacity: 0.9; }
   .account-cta {
     margin-top: auto;
