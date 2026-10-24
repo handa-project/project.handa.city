@@ -59,6 +59,8 @@ jobs:
       # PR 番号は fork 側が書いたもの = 信用できない入力。数字であることと、
       # その PR の head が今回ビルドしたコミットであることを確かめてから使う
       # (でないと別の PR のプレビューを上書きできてしまう)。
+      # CI の完了より先に PR が閉じられていたら上げない (preview-cleanup.yml
+      # が消した後に復活させないため)。
       - name: Resolve PR
         if: steps.artifact.outputs.found == 'true'
         id: pr
@@ -68,7 +70,12 @@ jobs:
             echo "::error::invalid PR number: $number"
             exit 1
           fi
-          pr_sha=$(gh api "repos/$REPO/pulls/$number" --jq .head.sha)
+          gh api "repos/$REPO/pulls/$number" > pr.json
+          if [ "$(jq -r .state pr.json)" != open ]; then
+            echo "PR #$number は閉じられているのでデプロイしない"
+            exit 0
+          fi
+          pr_sha=$(jq -r .head.sha pr.json)
           if [ "$pr_sha" != "$HEAD_SHA" ]; then
             echo "::error::PR #$number head ($pr_sha) does not match the built commit ($HEAD_SHA)"
             exit 1
@@ -84,7 +91,7 @@ jobs:
       # アカウントと被ると pages.dev のサブドメインに乱数が付き、ci.yml が
       # 組み立てる URL とずれるので、その場合は止めて名前の変更を促す。
       - name: Ensure Cloudflare Pages project
-        if: steps.artifact.outputs.found == 'true'
+        if: steps.pr.outputs.number != ''
         run: |
           api="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects"
           auth="Authorization: Bearer $CLOUDFLARE_API_TOKEN"
@@ -106,7 +113,7 @@ jobs:
       # https://pr-<番号>.<プロジェクト>.pages.dev で固定的に引ける。
       # pages.dev のプレビューには Cloudflare が X-Robots-Tag: noindex を付ける。
       - name: Deploy to Cloudflare Pages
-        if: steps.artifact.outputs.found == 'true'
+        if: steps.pr.outputs.number != ''
         run: >-
           npx --yes wrangler@4.146.0 pages deploy dist
           --project-name "$PROJECT"
@@ -122,7 +129,7 @@ jobs:
 
       # コメントは PR ごとに 1 件だけ。目印付きの既存コメントがあれば更新する。
       - name: Comment preview URL
-        if: steps.artifact.outputs.found == 'true'
+        if: steps.pr.outputs.number != ''
         run: |
           marker='<!-- pr-preview -->'
           url="https://pr-$PR_NUMBER.$PROJECT.pages.dev/"
