@@ -59,8 +59,8 @@ jobs:
       # PR 番号は fork 側が書いたもの = 信用できない入力。数字であることと、
       # その PR の head が今回ビルドしたコミットであることを確かめてから使う
       # (でないと別の PR のプレビューを上書きできてしまう)。
-      # CI の完了より先に PR が閉じられていたら上げない (preview-cleanup.yml
-      # が消した後に復活させないため)。
+      # CI の完了より先に PR が閉じられていたら上げない (閉じた PR の
+      # プレビューを差し替えたり、コメントを付け直したりしないため)。
       - name: Resolve PR
         if: steps.artifact.outputs.found == 'true'
         id: pr

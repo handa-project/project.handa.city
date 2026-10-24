@@ -269,7 +269,7 @@ cosense-site-kit（テーマ・CLI）や Astro の新しいバージョンは、
 
 PR ごとにサイトをビルドして [Cloudflare Pages](https://pages.cloudflare.com/) へ上げ、`https://pr-<PR番号>.<プロジェクト名>.pages.dev/` の URL を PR にコメントします。push するたびに同じ URL が更新されます。本番の GitHub Pages には影響しません（プレビューには Cloudflare が `noindex` を付けるので検索にも載りません）。
 
-PR を閉じる（マージを含む）と、そのプレビューは自動で削除され、URL は開けなくなります（`preview-cleanup.yml`）。この仕組みより前に閉じた PR のプレビューが残っているときは、**Actions →「PR preview cleanup」→「Run workflow」** に PR 番号を入れて消せます。
+PR を閉じても（マージを含む）、プレビューは最後のビルドのまま残ります。Cloudflare Pages はプレビューの件数にも保存容量にも上限・課金がないので、溜まっても困りません。消したいときは `npx wrangler pages deployment list --project-name <プロジェクト名>` で ID を調べ、`npx wrangler pages deployment delete <ID> --project-name <プロジェクト名> --force` で削除します。
 
 初回だけ次を設定します。未設定のあいだは何もしません（CI のビルドだけが走ります）。
 
