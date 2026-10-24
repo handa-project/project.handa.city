@@ -120,22 +120,28 @@ jobs:
           PR_NUMBER: ${{ steps.pr.outputs.number }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
 
-      # コメントは PR ごとに 1 件だけ。目印付きの既存コメントがあれば更新する。
+      # URL を載せた目印付きのコメントは PR ごとに 1 件で、あれば最新の
+      # コミットに書き換える。書き換えは通知が飛ばず気付けないので、2 回目
+      # 以降は更新を知らせる短いコメントも別に投稿する (目印は付けない)。
       - name: Comment preview URL
         if: steps.artifact.outputs.found == 'true'
         run: |
           marker='<!-- pr-preview -->'
           url="https://pr-$PR_NUMBER.$PROJECT.pages.dev/"
+          commit="https://github.com/$REPO/commit/$HEAD_SHA"
           body="$marker
           ### プレビュー
 
           $url
 
-          コミット \`${HEAD_SHA:0:7}\` のビルドです。push するたびに更新されます。"          id=$(gh api "repos/$REPO/issues/$PR_NUMBER/comments" --paginate \
+          コミット [\`${HEAD_SHA:0:7}\`]($commit) のビルドです。push するたびに更新されます。"
+          id=$(gh api "repos/$REPO/issues/$PR_NUMBER/comments" --paginate \
             --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"$marker\"))) | .id" \
             | head -n 1)
           if [ -n "$id" ]; then
             gh api -X PATCH "repos/$REPO/issues/comments/$id" -f body="$body" > /dev/null
+            gh api -X POST "repos/$REPO/issues/$PR_NUMBER/comments" \
+              -f body="プレビューをコミット [\`${HEAD_SHA:0:7}\`]($commit) のビルドに更新しました: $url" > /dev/null
           else
             gh api -X POST "repos/$REPO/issues/$PR_NUMBER/comments" -f body="$body" > /dev/null
           fi
