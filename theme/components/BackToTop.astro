@@ -43,6 +43,8 @@
     color: var(--color-accent);
     box-shadow: 0 10px 24px -10px rgb(0 0 0 / 0.35);
     cursor: pointer;
+    touch-action: manipulation; /* ダブルタップでの拡大待ちをしない */
+    -webkit-tap-highlight-color: transparent;
     /* ふだんは隠しておき、下へスクロールしたら下からふわっと出す */
     opacity: 0;
     visibility: hidden;
@@ -67,14 +69,20 @@
       color 0.15s var(--ease),
       border-color 0.15s var(--ease);
   }
-  .back-to-top:hover {
-    background: var(--color-accent);
-    border-color: var(--color-accent);
-    color: #fff;
+  /* マウスがある端末だけ、乗せたときに赤くする（スマホでは「乗せた」状態が残って 1 回目のタップが効かなくなることがあるため） */
+  @media (hover: hover) {
+    .back-to-top:hover {
+      background: var(--color-accent);
+      border-color: var(--color-accent);
+      color: #fff;
+    }
   }
+  .back-to-top:active { background: var(--color-accent); border-color: var(--color-accent); color: #fff; }
   .back-to-top:focus-visible { outline: 2px solid var(--color-blue, #1658a0); outline-offset: 3px; }
   @media (max-width: 720px) {
-    .back-to-top { right: 16px; bottom: 16px; width: 42px; height: 42px; }
+    /* スマホ：画面の一番下はブラウザ（iPhone の Safari など）が「下のバーを出す」ためにタップを横取りするので、
+       少し上に置く。ホームバーのある機種はその分も空ける */
+    .back-to-top { right: 16px; bottom: calc(64px + env(safe-area-inset-bottom, 0px)); width: 42px; height: 42px; }
   }
   @media (prefers-reduced-motion: reduce) {
     .back-to-top, .back-to-top.is-shown { transition: none; transform: none; }
