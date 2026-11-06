@@ -5,8 +5,9 @@ import BackLink from "../components/BackLink.astro";
 import Layout from "../components/Layout.astro";
 import SectionHeader from "../components/SectionHeader.astro";
 import WorkChips from "../components/WorkChips.astro";
+import MemberChips from "../components/MemberChips.astro";
 import { MEMBER_TAG, backLinkFor, loadSections, worksForMember } from "../lib/sections";
-import { displayName } from "../lib/members";
+import { displayName, memberInfo } from "../lib/members";
 
 // Profile template: a slim hero band over the body, no tag chips, and a
 // "more pages" footer pointing back into the rest of the site. Suitable for
@@ -33,46 +34,28 @@ const memberWorks = isMember ? await worksForMember(entry) : [];
 // 見出しに出す名前（メンバーは名前の後ろの（学科）などを出さない）
 const heading = isMember ? displayName(page.title) : page.title;
 
-// 本文に活動へのリンクだけの行がある場合、下の WORKS タグと重複するので本文からは消す
-const workTitles = new Set(memberWorks.map((w) => w.data.title.trim().toLowerCase()));
-type Inline = { type: string; value?: string; title?: string; children?: Inline[] };
-const onlyWorkLinks = (nodes: Inline[] | undefined): boolean => {
-  const meaningful = (nodes ?? []).filter((n) => !(n.type === "text" && !(n.value ?? "").trim()));
-  return (
-    meaningful.length > 0 &&
-    meaningful.every((n) => n.type === "pageLink" && workTitles.has((n.title ?? "").trim().toLowerCase()))
-  );
+// メンバーページ：サイトに出すのは 名前・学科と学年・役職（タグから）・最初の写真 1 枚・関わった活動 だけ。
+// 本文の文章やコード（UserScript の読み込みなど）は、何が書いてあってもサイトには出さない（lib/members.ts）
+const info = isMember ? memberInfo(page.tags) : undefined;
+const lead = info ? [info.role, info.line].filter(Boolean).join("・") || undefined : undefined;
+type ImageBlock = { type: "image"; url: string; href?: string };
+const firstImage = (): ImageBlock | undefined => {
+  const b = page.blocks.find((b) => b.type === "image") as ImageBlock | undefined;
+  if (b) return { type: "image", url: b.url };
+  return page.image ? { type: "image", url: page.image } : undefined;
 };
-// メンバーページ：学科・学年の行（「情報科学科 ３年」など）は、Cosense で写真の上に書いても
-// 下に書いても、いつも名前のすぐ下に出す（本文からは外す）。読み取り方は lib/members.ts と同じ
-const DEPT_LINE = /^(.*?)\s*(M|D|修士|博士)?\s*(\d)\s*年/i;
-const inlineText = (nodes: Inline[] | undefined): string =>
-  (nodes ?? []).map((n) => (n.type === "text" ? n.value ?? "" : n.type === "pageLink" ? n.title ?? "" : inlineText(n.children))).join("");
-let deptLine: string | undefined;
-let bodyBlocks = page.blocks;
-if (isMember) {
-  // 先頭のほう（写真や空行をはさんでも 4 ブロック目まで）にある、短い 1 行だけを対象にする
-  const i = page.blocks.slice(0, 4).findIndex((b) => {
-    if (b.type !== "paragraph" || !("children" in b)) return false;
-    const t = inlineText(b.children as Inline[]).normalize("NFKC").trim();
-    return t.length > 0 && t.length <= 40 && DEPT_LINE.test(t);
-  });
-  if (i >= 0) {
-    deptLine = inlineText((page.blocks[i] as { children?: Inline[] }).children).trim();
-    bodyBlocks = page.blocks.filter((_, j) => j !== i);
-  }
-}
-
-const blocks = workTitles.size
-  ? bodyBlocks.filter((b) => !(("children" in b) && (b.type === "paragraph" || b.type === "list") && onlyWorkLinks(b.children as Inline[])))
-  : bodyBlocks;
+const photo = isMember ? firstImage() : undefined;
+const blocks = isMember ? (photo ? [photo] : []) : page.blocks;
+const description = isMember ? lead : page.summary;
 ---
-<Layout title={heading} description={page.summary} image={page.image} ogType="article" sourceUrl={page.sourceUrl}>
+<Layout title={heading} description={description} image={page.image} ogType="article" sourceUrl={page.sourceUrl}>
   <article class="profile" data-pagefind-body>
     <BackLink back={back} />
-    <SectionHeader en={navSection?.en ?? back?.en} title={heading} lead={deptLine} />
+    <SectionHeader en={navSection?.en ?? back?.en} title={heading}>
+      {info && <div class="profile-chips"><MemberChips role={info.role} dept={info.dept} grade={info.grade} size="md" /></div>}
+    </SectionHeader>
 
-    <PageContent blocks={blocks} />
+    {blocks.length > 0 && <PageContent blocks={blocks as typeof page.blocks} />}
 
     {/* メンバーページ：関わった活動（名前・写真・本文の下に表示） */}
     {memberWorks.length > 0 && (
@@ -84,6 +67,7 @@ const blocks = workTitles.size
 </Layout>
 
 <style>
+  .profile-chips { margin-top: 0.75rem; }
   .profile-works { margin: 2rem 0 0; padding-top: 1.25rem; border-top: 1px solid var(--color-divider); }
   .profile-hero {
     text-align: center;

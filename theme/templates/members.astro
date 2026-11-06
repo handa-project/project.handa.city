@@ -4,22 +4,23 @@
 // 同じ人が同時に 2 回出ることはない。
 //
 // メンバーページの書き方（Cosense 側）:
-//   - タイトル = 名前
-//   - 本文 1 行目 = 一言（役割・所属など）→ カードの説明文になる
+//   - タイトル = 名前（同姓同名の別人は「半田太郎（建築）」のように（ ）を付ける。サイトでは（ ）は出ない）
 //   - 写真を貼ると最初の 1 枚がカード画像になる
-//   - タグ: #publish #member/2026 （複数年度なら #member/2025 #member/2026 と並べる）
+//   - タグ: #publish #member/2026 #学科/情報科学科 #学年/B3 （複数年度なら #member/2025 #member/2026 と並べる）
+//   - サイトに出るのは 名前・学科・学年・役職・最初の写真・関わった活動 だけ。本文の文章は出ない
+//   - 一覧のカードは 写真・名前・役職だけ（学年は個人ページにだけ出す）
 //
 // 並び順（くわしくは handa.config.ts の members）:
 //   学科ごとに見出しを付けてまとめる
 //   学科の中は 役職（#role/代表 #role/副代表）→ 学年の高い順 → 名前順（#yomi/すずきしょうま）
-//   学科・学年は本文 1 行目（「情報科学科 ３年」など）から読み取る。
-//   読み取れないときや変えたいときは #dept/情報科学科 #grade/3 のタグで指定できる
+//   学科・学年はタグ（#学科/情報科学科 #学年/B3）だけで決める。本文からは読まない
 //   ※ / の入ったタグはサイト上には表示されない
 import { path } from "@cosense-site-kit/theme-utils";
 import Layout from "../components/Layout.astro";
 import SectionHeader from "../components/SectionHeader.astro";
 import BackLink from "../components/BackLink.astro";
 import YearPicker from "../components/YearPicker.astro";
+import MemberChips from "../components/MemberChips.astro";
 import { homeBack } from "../lib/sections";
 import { sectionInfo } from "../lib/sections";
 import { loadMembers, deptRank, displayName, OTHER_DEPT } from "../lib/members";
@@ -64,7 +65,7 @@ const latest = allYears[0];
       <section class="member-group" data-dept={g.dept} hidden={!g.members.some((m) => m.years.includes(latest))}>
         {showHeadings && <h2 class="member-group-title">{g.dept}</h2>}
         <ul class="members-grid">
-          {g.members.map(({ entry, years, role }) => (
+          {g.members.map(({ entry, years, role, deptName }) => (
             <li data-years={`|${years.join("|")}|`} hidden={!years.includes(latest)}>
               <a href={path(entry.data.slug)} class="member-card">
                 {entry.data.image
@@ -79,8 +80,8 @@ const latest = allYears[0];
                     </span>
                   )}
                 <span class="member-text">
-                  <span class="member-name">{displayName(entry.data.title)}{role && <span class="member-badge">{role}</span>}</span>
-                  {entry.data.summary && <span class="member-summary">{entry.data.summary}</span>}
+                  <span class="member-name">{displayName(entry.data.title)}</span>
+                  <MemberChips role={role} dept={deptName} showDept={!showHeadings} />
                 </span>
               </a>
             </li>

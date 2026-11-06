@@ -44,7 +44,7 @@ const intros = {
 
 const contact = await loadContact();
 // ABOUT 欄に続けて並べるページ（無いページは飛ばす）
-const aboutMore = await loadAboutMore(); // #about/番号 タグのページと home.aboutMore（lib/about.ts）
+const aboutMore = await loadAboutMore(); // #about/番号 タグのページ（lib/about.ts）
 
 const siteTitle = site?.title ?? "Home";
 const siteDescription = site?.description;
@@ -83,7 +83,7 @@ const heroLogo = existsSync(join(process.cwd(), "public", "logo-full.png")) ? `$
       {s.kind === "about" && s.entry && (
         <Fragment>
           <SectionHeader as="h2" en={s.en} title={s.entry.data.title} />
-          {/* 概要：HAnDAプロジェクトとは＋続けて載せるページ（#about/番号 タグ・home.aboutMore。半田市とは・赤レンガ建物とは など） */}
+          {/* 概要：HAnDAプロジェクトとは＋続けて載せるページ（#about/番号 タグ。半田市とは・赤レンガ建物とは など） */}
           <AboutBlock entry={s.entry} heading={false} />
           {/* 学生チャレンジプロジェクトとは・半田市とは などのカード。1 枚ずつ見せて、左右の矢印かスワイプで送る */}
           {aboutMore.length > 0 && (

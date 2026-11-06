@@ -1,13 +1,20 @@
 ---
 // HAnDA: 中身（本文）の写真を「貼ってある」見た目にする包み。lib/pinned.ts を参照
 import { pinPhotos } from "../lib/pinned";
+import { BIG_MARK } from "../lib/bigText";
 const html = Astro.slots.has("default") ? await Astro.slots.render("default") : "";
 ---
-<Fragment set:html={pinPhotos(html)} />
+{/* 大きい文字（[** ] など）の印を class に置き換える（lib/bigText.ts） */}
+<Fragment set:html={pinPhotos(html).split(`<strong>${BIG_MARK}`).join('<strong class="big-text">').split(BIG_MARK).join("")} />
 
 <script>
   // 写真が読み込み終わったら「読み込み中」を消す（.is-loaded）
-  const done = (img: HTMLImageElement) => img.closest(".pinned")?.classList.add("is-loaded");
+  // 縦横比（--ar）がまだ無い写真には、届いた写真の大きさから入れる（handa.css の台紙の幅に使う）
+  const done = (img: HTMLImageElement) => {
+    if (img.naturalWidth && img.naturalHeight && !img.style.getPropertyValue("--ar"))
+      img.style.setProperty("--ar", (img.naturalWidth / img.naturalHeight).toFixed(4));
+    img.closest(".pinned")?.classList.add("is-loaded");
+  };
   document.querySelectorAll<HTMLImageElement>(".pinned img").forEach((img) => {
     if (img.complete && img.naturalWidth) done(img);
     else {

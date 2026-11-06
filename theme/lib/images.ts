@@ -87,6 +87,12 @@ export async function optimizeImages(html: string): Promise<string> {
     tag = setAttr(tag, "sizes", sizesFor(tag, parent, opt.width));
     if (!/\swidth="/.test(tag)) tag = setAttr(tag, "width", String(opt.width));
     if (!/\sheight="/.test(tag)) tag = setAttr(tag, "height", String(opt.height));
+    // 縦横比（handa.css で、縦長の写真を無理に横へ広げないために使う）
+    if (opt.height > 0 && !/--ar:/.test(tag)) {
+      const ar = `--ar:${(opt.width / opt.height).toFixed(4)}`;
+      const style = tag.match(/\sstyle="([^"]*)"/)?.[1];
+      tag = setAttr(tag, "style", style ? `${style.replace(/;?\s*$/, "")};${ar}` : ar);
+    }
     out += html.slice(last, start) + tag;
     last = start + m[0].length;
   });

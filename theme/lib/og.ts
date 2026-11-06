@@ -14,7 +14,7 @@ import { Resvg } from "@resvg/resvg-js";
 import { handaConfig } from "./config";
 import { MEMBER_TAG, postsTag, sectionInfo, worksTag } from "./sections";
 import { loadAboutMore } from "./about";
-import { displayName } from "./members";
+import { displayName, memberInfo } from "./members";
 
 export interface OgEntry {
   /** ページの URL（/works/ など） */
@@ -59,7 +59,7 @@ export function ogEntries(): Promise<OgEntry[]> {
               ? "About"
               : "";
       const isMember = tags.some((t) => MEMBER_TAG.test(t));
-      add(sitePath(e.data.slug), { eyebrow, title: isMember ? displayName(e.data.title) : e.data.title, description: e.data.summary });
+      add(sitePath(e.data.slug), { eyebrow, title: isMember ? displayName(e.data.title) : e.data.title, description: isMember ? memberInfo(tags).line : e.data.summary });
     }
     // 同じ URL が重なったら最初のものだけ
     const seen = new Set<string>();

@@ -83,8 +83,9 @@ h2, h3, h4, h5, h6 { letter-spacing: 0.03em; }
   text-decoration: none;
 }
 
-/* ---- 赤文字（Cosense で $$ と $$ で挟んだ文字。theme/lib/redText.ts） ---- */
-.red-text { color: var(--color-accent); font-weight: 700; }
+/* ---- 赤文字：Cosense で 1 段以上大きくした文字（[** ] 以上。theme/lib/bigText.ts）と、行全体を囲んだ見出しは赤。
+   [* ]（太字）は赤くしない ---- */
+.page-content :is(.big-text, h2, h3, h4) { color: var(--color-accent); }
 
 /* ---- 本文中の設定用タグ（#slug/… #template/… #member/2026 など）は表示しない ---- */
 .tag-meta { display: none; }
@@ -144,6 +145,9 @@ html {
     transform 0.55s cubic-bezier(0.4, 0, 0.2, 1),
     opacity 0.45s ease 0.08s;
 }
+/* ページを開いた直後（再読み込み・スクロール位置の復元など）は動かさない。
+   最初の表示が落ち着いてから is-ready を付けて、出し入れの動きを有効にする（Header.astro） */
+.site-header:not(.is-ready), .site-header:not(.is-ready).is-hidden { transition: none; }
 @media (prefers-reduced-motion: reduce) {
   .site-header, .site-header.is-hidden { transition: none; }
 }
@@ -466,7 +470,7 @@ html.is-leaving .site-nav:not(:has(a.is-active)) a.is-going .nav-mark {
   width: fit-content;
   max-width: calc(100% - 1rem);
   margin: 2.2rem auto;
-  padding: 10px 10px 12px;
+  padding: 10px; /* 白いふちは四方とも同じ幅 */
   background: #fff;
   box-shadow:
     0 1px 2px rgb(0 0 0 / 0.14),
@@ -487,21 +491,22 @@ html.is-leaving .site-nav:not(:has(a.is-active)) a.is-going .nav-mark {
 }
 /* 小さすぎる写真は、最低限の幅（PC は 360px・スマホは画面の6割）まで拡大して見せる。
    元が小さいと少しぼやけるが、切手のように小さく表示されるよりは見やすい。
-   縦長の写真で高さの上限にかかったときは、縦横比を保って枠の中に収める */
+   ただし縦長の写真は、先に高さの上限（global.css の max-height）に届いたらそれ以上は横に広げない
+   （--ar は写真の 横÷縦。lib/images.ts と Pinned.astro が入れる）。こうすると台紙の白いふちが四方で同じ幅になる */
 .page-content :where(img:not(.inline-image, .icon, .icon-strong)) {
-  min-width: min(360px, 60vw);
+  min-width: min(360px, 60vw, calc(min(53vh, 400px) * var(--ar, 100)));
   object-fit: contain;
 }
 /* 写真が届くまでは、写真の大きさの枠を確保しておく（読み込み中の表示を出すため） */
 .page-content .pinned:not(.is-loaded) img {
-  min-width: min(480px, 100%);
+  min-width: min(480px, 100%, calc(min(53vh, 400px) * var(--ar, 100)));
   min-height: 220px;
 }
 
 /* 読み込み中：写真の場所に、ゆっくり光が流れる灰色の面と「読み込み中」 */
 .pinned-loading {
   position: absolute;
-  inset: 10px 10px 12px;
+  inset: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -619,8 +624,8 @@ html.is-leaving .site-nav:not(:has(a.is-active)) a.is-going .nav-mark {
 }
 
 @media (max-width: 720px) {
-  .page-content .pinned { padding: 7px 7px 9px; margin: 1.8rem auto; }
-  .pinned-loading { inset: 7px 7px 9px; }
+  .page-content .pinned { padding: 7px; margin: 1.8rem auto; }
+  .pinned-loading { inset: 7px; }
   .pinned--tape1::before { width: 84px; height: 22px; top: -11px; }
   .pinned--tape2::before,
   .pinned--tape2::after { width: 64px; height: 20px; }

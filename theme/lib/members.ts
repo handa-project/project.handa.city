@@ -35,31 +35,45 @@ const tagValue = (tags: string[], ...prefixes: string[]) => {
   return undefined;
 };
 
-// 学年を数値に（大きいほど上の学年）。D1〜 > M1〜 > 4年〜1年 > 不明
-function gradeRank(raw?: string): number {
-  if (!raw) return 0;
-  const t = raw.normalize("NFKC").trim();
-  let m = t.match(/^(?:D|博士)\s*(\d)/i);
-  if (m) return 300 + Number(m[1]);
-  m = t.match(/^(?:M|修士)\s*(\d)/i);
-  if (m) return 200 + Number(m[1]);
-  m = t.match(/^B?\s*(\d)\s*(?:年)?$/i);
-  if (m) return 100 + Number(m[1]);
-  return 0;
+// 学年のタグ（#学年/B3 #学年/M1 など）を「B3」「M1」の形にそろえる。数字だけ（#学年/3）は学部として B3 にする
+export function gradeLabel(raw?: string): string | undefined {
+  if (!raw) return undefined;
+  const t = raw.normalize("NFKC").trim().toUpperCase().replace(/\s+/g, "").replace(/年$/, "");
+  const m = t.match(/^(B|M|D|学部|修士|博士)?(\d)$/);
+  if (!m) return t || undefined;
+  const kind = m[1] === "修士" ? "M" : m[1] === "博士" ? "D" : m[1] === "学部" ? "B" : m[1] ?? "B";
+  return `${kind}${m[2]}`;
 }
 
-// 本文 1 行目（例：「情報科学科 ３年」「大学院経情科 １年」）から学科と学年を読み取る（タグが無いとき用）
-function fromSummary(summary?: string): { dept?: string; grade: number } {
-  const t = (summary ?? "").normalize("NFKC").trim();
-  const m = t.match(/^(.*?)\s*(M|D|修士|博士)?\s*(\d)\s*年/i);
-  if (!m) return { grade: 0 };
-  const dept = m[1].replace(/[\/／|｜・,、]\s*$/, "").trim() || undefined;
-  const n = Number(m[3]);
-  const kind = (m[2] ?? "").toUpperCase();
-  const grad = kind === "D" || kind === "博士" ? 300 : kind === "M" || kind === "修士" || /大学院|研究科/.test(dept ?? "") ? 200 : 100;
-  return { dept, grade: grad + n };
+// 表示用の学年：B3 → ３年、M1 → 修士１年、D1 → 博士１年（タグは B3 などのまま）
+const zen = (d: string) => String.fromCharCode(d.charCodeAt(0) + 0xfee0);
+export function gradeText(label?: string): string | undefined {
+  const m = label?.match(/^([BMD])(\d)$/);
+  if (!m) return label;
+  return `${{ B: "", M: "修士", D: "博士" }[m[1] as "B" | "M" | "D"]}${zen(m[2])}年`;
 }
 
+// 学年を数値に（大きいほど上の学年）。D > M > B > 不明
+function gradeRank(label?: string): number {
+  const m = label?.match(/^([BMD])(\d)$/);
+  if (!m) return 0;
+  return { B: 100, M: 200, D: 300 }[m[1] as "B" | "M" | "D"] + Number(m[2]);
+}
+
+/** メンバーかどうか（#member/2026 などが付いている） */
+export const isMemberPage = (tags: string[]) => tags.some((t) => MEMBER_TAG.test(t));
+
+/**
+ * メンバーページのタグから、サイトに出す情報を読む。本文は読まない（本文に何を書いてもサイトには出ない）
+ *   #学科/情報科学科（#dept/ も可）  #学年/B3（#grade/ も可）  #role/代表（#役職/ も可）
+ */
+export function memberInfo(tags: string[]) {
+  const legacyLeader = tags.some((t) => ["member/leader", "role/leader"].includes(t.toLowerCase()));
+  const role = tagValue(tags, "role", "役職") ?? (legacyLeader ? "代表" : undefined);
+  const dept = tagValue(tags, "学科", "dept");
+  const grade = gradeLabel(tagValue(tags, "学年", "grade"));
+  return { role, dept, grade, line: [dept, gradeText(grade)].filter(Boolean).join(" ") || undefined };
+}
 
 // 1 人 1 件。その人の在籍年度・学科・学年・読み方・役職を持たせる
 export async function loadMembers() {
@@ -70,18 +84,19 @@ export async function loadMembers() {
     const years = [
       ...new Set(tags.map((t) => t.match(MEMBER_TAG)?.[1]).filter((y): y is string => Boolean(y))),
     ].sort();
-    const legacyLeader = tags.some((t) => ["member/leader", "role/leader"].includes(t.toLowerCase()));
-    const role = tagValue(tags, "role", "役職") ?? (legacyLeader ? "LEADER" : undefined);
-    const roleIdx = role ? ROLE_ORDER.indexOf(role) : -1;
-    const guess = fromSummary(entry.data.summary);
+    const info = memberInfo(tags);
+    const roleIdx = info.role ? ROLE_ORDER.indexOf(info.role) : -1;
     return {
       entry,
       years,
-      dept: tagValue(tags, "dept", "学科") ?? guess.dept ?? OTHER_DEPT,
-      grade: gradeRank(tagValue(tags, "grade", "学年")) || guess.grade,
+      dept: info.dept ?? OTHER_DEPT,
+      grade: gradeRank(info.grade),
+      line: info.line,
+      deptName: info.dept,
+      gradeLabel: info.grade,
       yomi: (tagValue(tags, "yomi", "よみ") ?? entry.data.title).normalize("NFKC"),
-      role,
-      roleRank: role ? (roleIdx >= 0 ? ROLE_ORDER.length - roleIdx : 1) : 0,
+      role: info.role,
+      roleRank: info.role ? (roleIdx >= 0 ? ROLE_ORDER.length - roleIdx : 1) : 0,
     };
   })
   .filter((m) => m.years.length > 0)

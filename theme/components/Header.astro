@@ -305,6 +305,10 @@ const isActive = (href: string): boolean => {
       { passive: true },
     );
     header.addEventListener("focusin", () => setHidden(false));
+    // ページを開いた直後は動きを止めておき、表示が落ち着いてから出し入れの動きを有効にする（handa.css の is-ready）
+    const ready = () => requestAnimationFrame(() => requestAnimationFrame(() => header.classList.add("is-ready")));
+    if (document.readyState === "complete") ready();
+    else window.addEventListener("load", ready, { once: true });
     // 「戻る」でキャッシュから復元されたときは出した状態から
     window.addEventListener("pageshow", (e) => {
       if (!e.persisted) return;

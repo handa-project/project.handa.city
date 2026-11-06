@@ -59,6 +59,8 @@
   // 前のページ側。離れる直前に vt-old を付けて、中身の名前を「前のページ用」に変える
   window.addEventListener("pageswap", function (e) {
     if (!e.viewTransition) return;
+    // 再読み込みでは画面遷移の動きをしない（同じ画面どうしを重ねて切り替えるので、メニューバーなどが一瞬薄くなって見えるため）
+    if (e.activation && e.activation.navigationType === "reload") return e.viewTransition.skipTransition();
     document.documentElement.classList.add("vt-old");
     var to = e.activation && e.activation.entry && e.activation.entry.url;
     if (to) addType(e.viewTransition, direction(location.href, to));
@@ -71,7 +73,11 @@
   window.addEventListener("pagereveal", function (e) {
     var act = window.navigation && navigation.activation;
     var from = act && act.from && act.from.url;
-    if (!from || act.navigationType === "reload") return;
+    if (act && act.navigationType === "reload") {
+      if (e.viewTransition) e.viewTransition.skipTransition();
+      return;
+    }
+    if (!from) return;
     if (new URL(from).origin !== location.origin) return;
     addType(e.viewTransition, direction(from, location.href));
     var html = document.documentElement;

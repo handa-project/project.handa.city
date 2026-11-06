@@ -39,7 +39,7 @@ const back = await backLinkFor(page.tags);
 // 活動・成果のページは日付を出さない
 const isWorks = await isWorksPage(entry);
 // HAnDA: 概要ページ（handa.config.ts の home.about）の下に、続けて載せるページ（半田市とは・赤レンガ建物とは など）。
-// Cosense で #about/番号 タグを付けたページと、handa.config.ts の home.aboutMore（lib/about.ts）
+// Cosense で #about/番号 タグを付けたページ（lib/about.ts）
 const aboutMore = page.title === handaConfig.home.about ? await loadAboutMore() : [];
 const isAbout = page.title === handaConfig.home.about;
 // 概要ページの目次（ページ内の各項目へ）

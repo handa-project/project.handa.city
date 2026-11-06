@@ -16,6 +16,7 @@
     "@cosense-site-kit/cli": "^0.1.13",
     "@cosense-site-kit/core": "^0.4.3",
     "@cosense-site-kit/theme-utils": "^0.5.1",
+    "@progfay/scrapbox-parser": "^10.1.1",
     "@resvg/resvg-js": "^2.6.2",
     "astro": "^7.3.5",
     "pagefind": "^1.5.2",
